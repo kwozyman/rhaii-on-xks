@@ -77,10 +77,31 @@ authFile: ""
 6. Sail Operator deployment + RBAC
 7. Istio CR with Gateway API enabled
 
-**Post-install hook:**
-8. Patches `istiod` ServiceAccount with pull secret (waits up to 5 min for SA to be created)
+**Manual step (after install):**
+8. Patch `istiod` ServiceAccount with pull secret (see [Post-Deployment](#post-deployment-pull-secret-configuration))
 
-> **Why hooks?** CRDs are too large for Helm (some are 700KB+, Helm has 1MB limit) and require `--server-side` apply. The istiod SA is created asynchronously by the operator.
+> **Why presync hooks?** CRDs are too large for Helm (some are 700KB+, Helm has 1MB limit) and require `--server-side` apply.
+
+## Version Compatibility
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Sail Operator | 3.2.1 | Red Hat Service Mesh 3.x |
+| Istio | v1.27.3 | Latest in bundle 3.2.1 |
+| Gateway API CRDs | v1.4.0 | Kubernetes SIG |
+| Gateway API Inference Extension | v1.2.0 | For LLM inference routing |
+
+### Gateway API Inference Extension (llm-d) Compatibility
+
+For full **InferencePool v1** support (required by [llm-d](https://github.com/llm-d/llm-d) and similar LLM serving platforms):
+
+| Requirement | This Chart | Status |
+|-------------|-----------|--------|
+| Gateway API CRDs | v1.4.0 | Compatible |
+| Inference Extension CRDs | v1.2.0 | Compatible |
+| Istio | v1.27.3 | **Partial** - v1.28.0+ required for full InferencePool v1 |
+
+> **Note:** Istio 1.28 will be GA with **OCP 4.21 (February 2025)**. Until then, some InferencePool features may not work as expected with Istio 1.27.x.
 
 ## Update to New Bundle Version
 
@@ -116,15 +137,36 @@ kubectl get pods -n istio-system -l app=istiod
 
 # Full cleanup including CRDs
 ./scripts/cleanup.sh --include-crds
+
+# Clean cached images from nodes (optional, requires Eraser)
+./scripts/cleanup-images.sh --install-eraser
 ```
 
 ---
 
-## Post-Deployment: Application Namespaces
+## Post-Deployment: Pull Secret Configuration
+
+### 1. Patch istiod ServiceAccount (after helmfile apply, before llm-d)
+
+After running `helmfile apply`, the Sail Operator creates the istiod pod. Patch its ServiceAccount with the pull secret:
+
+```bash
+# Wait for istiod SA to be created
+kubectl wait --for=create sa/istiod -n istio-system --timeout=300s
+
+# Patch the SA with pull secret
+kubectl patch sa istiod -n istio-system \
+  -p '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
+
+# Restart istiod to pick up the new pull secret
+kubectl delete pod -n istio-system -l app=istiod
+```
+
+### 2. Configure Application Namespace (after llm-d is deployed)
 
 When deploying applications that use Istio Gateway API (e.g., llm-d), Istio auto-provisions Gateway pods in **your application namespace**. These pods pull `istio-proxyv2` from `registry.redhat.io` and need the pull secret.
 
-**After deploying your application (e.g., llm-d), run these steps:**
+**After deploying llm-d, run these steps:**
 
 ```bash
 # Set your application namespace
@@ -147,7 +189,7 @@ kubectl delete pod -n ${APP_NAMESPACE} -l gateway.istio.io/managed=istio.io-gate
 **Example for llm-d:**
 
 ```bash
-export APP_NAMESPACE=llmd-pd-aputtur
+export APP_NAMESPACE=llmd-pd
 
 kubectl get secret redhat-pull-secret -n istio-system -o yaml | \
   sed "s/namespace: istio-system/namespace: ${APP_NAMESPACE}/" | \
@@ -184,10 +226,11 @@ sail-operator-chart/
 │   ├── deployment-*.yaml        # Sail Operator deployment
 │   ├── istio-cr.yaml            # Istio CR with Gateway API
 │   ├── pull-secret.yaml         # Registry pull secret
-│   ├── post-install-hook.yaml   # Patches istiod SA after install
 │   └── *.yaml                   # RBAC, ServiceAccount, etc.
 └── scripts/
     ├── update-bundle.sh         # Update to new bundle version
     ├── cleanup.sh               # Full uninstall
-    └── copy-pull-secret.sh      # Copy secret to app namespaces
+    ├── cleanup-images.sh        # Remove cached images from nodes (uses Eraser)
+    ├── copy-pull-secret.sh      # Copy secret to app namespaces
+    └── post-install-message.sh  # Prints next steps after helmfile apply
 ```

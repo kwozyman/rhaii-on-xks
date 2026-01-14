@@ -18,11 +18,3 @@ pullSecret:
 useSystemPodmanAuth: false
 pullSecretFile: ""
 authFile: ""
-
-istio:
-  enabled: true
-  version: v1.27.3
-
-gatewayAPI:
-  version: "v1.4.0"
-  inferenceExtensionVersion: "v1.2.0"
