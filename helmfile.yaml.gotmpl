@@ -5,6 +5,7 @@ helmDefaults:
 environments:
   default:
     values:
+      - values.yaml
       - environments/default.yaml
 
 ---
@@ -40,19 +41,10 @@ releases:
           - manifests-crds/
       - events: ["presync"]
         showlogs: true
-        command: kubectl
+        command: bash
         args:
-          - create
-          - namespace
-          - {{ .Values.namespace | default "openshift-lws-operator" }}
-          - --dry-run=client
-          - -o
-          - yaml
-          - "|"
-          - kubectl
-          - apply
-          - -f
-          - "-"
+          - -c
+          - "kubectl create namespace {{ .Values.namespace | default "openshift-lws-operator" }} --dry-run=client -o yaml | kubectl apply -f -"
 {{- if .Values.lwsOperator.enabled }}
       - events: ["postsync"]
         showlogs: true
