@@ -15,55 +15,77 @@ This chart uses **olm-extractor** to extract manifests directly from Red Hat's O
 
 - `kubectl` configured for your cluster
 - `helmfile` installed
-- `podman login registry.redhat.io` (for Red Hat registry auth)
+- Red Hat account for pull secret
 
 ## Quick Start
 
 ```bash
+# 1. Clone the chart
+git clone https://github.com/aneeshkp/cert-manager-operator-chart.git
 cd cert-manager-operator-chart
 
-# 1. Login to Red Hat registry
-podman login registry.redhat.io
+# 2. Setup pull secret (see Configuration below)
 
-# 2. Deploy
+# 3. Deploy
 helmfile apply
+
+# 4. Verify
+kubectl get pods -n cert-manager-operator
+kubectl get pods -n cert-manager
 ```
 
 ## Configuration
 
-Edit `environments/default.yaml`. Choose ONE auth method:
+### Step 1: Get Red Hat Pull Secret
 
-### Option A: System Podman Auth (Recommended)
+1. Go to: https://console.redhat.com/openshift/install/pull-secret
+2. Login and download pull secret
+3. Save as `~/pull-secret.txt`
 
+### Step 2: Setup Auth (Choose ONE)
+
+#### Option A: Persistent Podman Auth (Recommended)
+
+```bash
+# Copy pull secret to persistent location
+mkdir -p ~/.config/containers
+cp ~/pull-secret.txt ~/.config/containers/auth.json
+```
+
+Then in `environments/default.yaml`:
 ```yaml
-# environments/default.yaml
 useSystemPodmanAuth: true
 ```
 
-### Option B: Pull Secret File
+#### Option B: Pull Secret File
 
+```bash
+# Verify pull secret works
+podman pull --authfile ~/pull-secret.txt registry.redhat.io/ubi8/ubi-minimal --quiet && echo "Auth works!"
+```
+
+Then in `environments/default.yaml`:
 ```yaml
-# environments/default.yaml
 pullSecretFile: ~/pull-secret.txt
 ```
 
 ## What Gets Deployed
 
-**Presync hooks (before Helm install):**
-1. cert-manager CRDs + Infrastructure CRD stub - applied with `--server-side`
-2. Infrastructure CR (required for non-OpenShift clusters)
-3. Operand namespace (`cert-manager`)
-4. CertManager CR (`cluster`)
+**Presync hooks** (before Helm install):
+- cert-manager CRDs + Infrastructure CRD stub - applied with `--server-side`
+- Infrastructure CR (required for non-OpenShift clusters)
+- Operand namespace (`cert-manager`)
+- CertManager CR (`cluster`)
 
 **Helm install:**
-5. Operator namespace (`cert-manager-operator`)
-6. Pull secrets (in both namespaces)
-7. cert-manager ServiceAccounts with `imagePullSecrets` (cert-manager, cert-manager-cainjector, cert-manager-webhook)
-8. cert-manager Operator deployment + RBAC
+- Operator namespace (`cert-manager-operator`)
+- Pull secrets (in both namespaces)
+- cert-manager ServiceAccounts with `imagePullSecrets` (cert-manager, cert-manager-cainjector, cert-manager-webhook)
+- cert-manager Operator deployment + RBAC
 
-**Post-install (automatic):**
-9. Operator deploys cert-manager components (controller, webhook, cainjector)
-10. Operator reconciles ServiceAccounts (adds labels, preserves `imagePullSecrets`)
+**Post-install** (automatic):
+- Operator deploys cert-manager components (controller, webhook, cainjector)
+- Operator reconciles ServiceAccounts (adds labels, preserves `imagePullSecrets`)
 
 ## Version Compatibility
 

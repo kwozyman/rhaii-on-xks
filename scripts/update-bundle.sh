@@ -21,14 +21,19 @@ echo "Version: $VERSION"
 echo "Bundle: $BUNDLE_IMAGE"
 echo ""
 
-# Check for auth
-if [ ! -f "${XDG_RUNTIME_DIR}/containers/auth.json" ]; then
+# Check for auth (persistent location first, then session)
+if [ -f ~/.config/containers/auth.json ]; then
+  AUTH_FILE=~/.config/containers/auth.json
+elif [ -f "${XDG_RUNTIME_DIR}/containers/auth.json" ]; then
+  AUTH_FILE="${XDG_RUNTIME_DIR}/containers/auth.json"
+else
   echo "ERROR: Not logged in to registry.redhat.io"
   echo "Run: podman login registry.redhat.io"
+  echo "Then: cp ~/pull-secret.txt ~/.config/containers/auth.json"
   exit 1
 fi
 
-AUTH_ARG="-v ${XDG_RUNTIME_DIR}/containers/auth.json:/root/.docker/config.json:z"
+AUTH_ARG="-v ${AUTH_FILE}:/root/.docker/config.json:z"
 
 # Create temp directory
 TMP_DIR=$(mktemp -d)
