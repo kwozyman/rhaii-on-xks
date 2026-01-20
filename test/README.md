@@ -1,197 +1,90 @@
-# LeaderWorkerSet (LWS) Tests
+# LWS Tests
 
-Tests to validate that the LeaderWorkerSet operator is working correctly.
+Quick tests to check the operator is working.
 
-## Available Tests
+## Tests
 
-| Test | File | Purpose |
-|------|------|---------|
-| Ring Test | `lws-ring-test.yaml` | Basic LWS validation - leader/worker topology and connectivity |
-| Network Test | `lws-network-test.yaml` | Network bandwidth test with iperf3/ping (credit: David Whyte-Gray) |
+- `lws-ring-test.yaml` - spins up a leader + 3 workers, workers register with leader over HTTP
+- `lws-network-test.yaml` - iperf3 bandwidth test between leader/worker (based on David Whyte-Gray's RDMA test pattern)
 
----
-
-# Ring Test (lws-ring-test.yaml)
-
-A simple test to validate that the LeaderWorkerSet operator is working correctly.
-
-## What This Tests
-
-1. **LWS creates correct pod topology** - Leader pod + worker pods
-2. **Leader address injection** - Workers can discover leader via `LWS_LEADER_ADDRESS`
-3. **Network connectivity** - Workers can HTTP call the leader
-4. **Group coordination** - All workers register with leader
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    LeaderWorkerSet                          │
-│                    name: ring-test                          │
-│                    replicas: 1 (one group)                  │
-│                    size: 4 (1 leader + 3 workers)           │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│   ┌─────────────┐                                          │
-│   │   LEADER    │  ← ring-test-0 (worker-index: 0)         │
-│   │  Port 8080  │                                          │
-│   │             │  Endpoints:                               │
-│   │  - /health  │   - Returns status + registered workers  │
-│   │  - /register│   - Workers call this to register        │
-│   │  - /workers │   - Lists all registered worker IPs      │
-│   └──────▲──────┘                                          │
-│          │                                                  │
-│          │ HTTP calls to register                           │
-│          │                                                  │
-│   ┌──────┴──────┐  ┌─────────────┐  ┌─────────────┐       │
-│   │  WORKER 1   │  │  WORKER 2   │  │  WORKER 3   │       │
-│   │ Port 8080   │  │ Port 8080   │  │ Port 8080   │       │
-│   │             │  │             │  │             │       │
-│   │ ring-test-0-1│ │ring-test-0-2│ │ring-test-0-3│       │
-│   │ worker-idx:1│  │worker-idx:2 │  │worker-idx:3 │       │
-│   └─────────────┘  └─────────────┘  └─────────────┘       │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## How LWS Provides Leader Discovery
-
-LWS automatically injects metadata into each pod:
-
-| Mechanism | Type | Value |
-|-----------|------|-------|
-| `leaderworkerset.sigs.k8s.io/leader-address` | Annotation | Leader's pod IP |
-| `leaderworkerset.sigs.k8s.io/group-index` | Label | Which replica group (0, 1, 2...) |
-| `leaderworkerset.sigs.k8s.io/worker-index` | Label | Position in group (0=leader, 1,2,3=workers) |
-
-## Prerequisites
-
-- LeaderWorkerSet operator installed (via lws-operator-chart)
-- kubectl configured to access your cluster
-
-## Deploy
+## Usage
 
 ```bash
+# deploy
 kubectl apply -f lws-ring-test.yaml
-```
 
-## Verify
-
-### 1. Watch pods come up
-
-```bash
+# watch
 kubectl get pods -n lws-test -w
-```
 
-Expected output:
-```
-NAME             READY   STATUS    RESTARTS   AGE
-ring-test-0      1/1     Running   0          30s   # Leader
-ring-test-0-1    1/1     Running   0          30s   # Worker 1
-ring-test-0-2    1/1     Running   0          30s   # Worker 2
-ring-test-0-3    1/1     Running   0          30s   # Worker 3
-```
+# check logs
+kubectl logs -n lws-test ring-test-0      # leader
+kubectl logs -n lws-test ring-test-0-1    # worker
 
-### 2. Check leader logs (see workers registering)
-
-```bash
-kubectl logs -n lws-test ring-test-0
-```
-
-Expected output:
-```
-==========================================
-  LEADER STARTING
-==========================================
-Hostname: ring-test-0
-IP: 10.224.0.50
-Group Index: 0
-Worker Index: 0
-
-Starting leader HTTP server on port 8080...
-[REGISTERED] Worker from 10.224.0.51
-[REGISTERED] Worker from 10.224.0.52
-[REGISTERED] Worker from 10.224.0.53
-```
-
-### 3. Check worker logs (see leader discovery)
-
-```bash
-kubectl logs -n lws-test ring-test-0-1
-```
-
-Expected output:
-```
-==========================================
-  WORKER STARTING
-==========================================
-Hostname: ring-test-0-1
-IP: 10.224.0.51
-Group Index: 0
-Worker Index: 1
-Leader Address: 10.224.0.50
-
-Waiting for leader at 10.224.0.50:8080...
-Leader is ready!
-
-Registering with leader...
-  Result: registered 10.224.0.51
-
-Leader status:
-{
-    "status": "healthy",
-    "role": "leader",
-    "hostname": "ring-test-0",
-    "registered_workers": ["10.224.0.51"]
-}
-```
-
-### 4. Query leader status (see all registered workers)
-
-```bash
-kubectl exec -n lws-test ring-test-0 -- curl -s localhost:8080/health
-```
-
-Expected output:
-```json
-{
-  "status": "healthy",
-  "role": "leader",
-  "hostname": "ring-test-0",
-  "ip": "10.224.0.50",
-  "group_index": "0",
-  "worker_index": "0",
-  "registered_workers": [
-    "10.224.0.51",
-    "10.224.0.52",
-    "10.224.0.53"
-  ]
-}
-```
-
-## Success Criteria
-
-- All 4 pods are Running and Ready
-- Leader logs show 3 workers registered
-- Worker logs show successful leader discovery and registration
-- Leader `/health` endpoint lists all 3 worker IPs
-
-## Cleanup
-
-```bash
+# cleanup
 kubectl delete -f lws-ring-test.yaml
 ```
 
+## Ring test details
+
+Creates 1 group with 4 pods (1 leader + 3 workers). Each worker:
+1. Waits for leader to be ready
+2. Registers with leader via HTTP
+3. Starts its own HTTP server
+
+```
+                    ┌─────────────┐
+                    │   LEADER    │  ring-test-0
+                    │  :8080      │
+                    │  /health    │
+                    │  /register  │
+                    └──────▲──────┘
+                           │
+          ┌────────────────┼────────────────┐
+          │                │                │
+    ┌─────┴─────┐   ┌──────┴────┐   ┌───────┴───┐
+    │ WORKER 1  │   │ WORKER 2  │   │ WORKER 3  │
+    │ring-test  │   │ring-test  │   │ring-test  │
+    │   -0-1    │   │   -0-2    │   │   -0-3    │
+    └───────────┘   └───────────┘   └───────────┘
+```
+
+LWS injects these into each pod:
+- `leaderworkerset.sigs.k8s.io/leader-address` (annotation) - leader IP
+- `leaderworkerset.sigs.k8s.io/group-index` (label) - which replica group
+- `leaderworkerset.sigs.k8s.io/worker-index` (label) - 0=leader, 1+=workers
+
+## Verify it's working
+
+Ring test - all 3 workers should be registered:
+```bash
+kubectl exec -n lws-test ring-test-0 -- curl -s localhost:8080/health
+# should show: "registered_workers": ["10.x.x.x", "10.x.x.x", "10.x.x.x"]
+```
+
+Network test - check iperf3 results:
+```bash
+kubectl logs -n lws-test network-test-0-1 | tail -10
+# should show bandwidth results like "20.3 Gbits/sec" and "=== TEST COMPLETE ==="
+```
+
+## Network test details
+
+Uses netshoot image. Leader runs iperf3 server, worker runs iperf3 client + ping test.
+
 ## Troubleshooting
 
-### Pods stuck in Pending
-- Check if LWS operator is running: `kubectl get pods -n openshift-lws-operator`
-- Check LWS operator logs: `kubectl logs -n openshift-lws-operator -l app.kubernetes.io/name=lws`
+Pods stuck pending?
+```bash
+kubectl get pods -n openshift-lws-operator
+kubectl logs -n openshift-lws-operator -l app.kubernetes.io/name=lws
+```
 
-### Workers can't reach leader
-- Check if leader pod IP is correctly injected: `kubectl get pod ring-test-0-1 -n lws-test -o jsonpath='{.metadata.annotations}'`
-- Check network policies: `kubectl get networkpolicy -n lws-test`
+Workers can't reach leader?
+```bash
+kubectl get pod ring-test-0-1 -n lws-test -o jsonpath='{.metadata.annotations}'
+```
 
-### LWS not creating pods
-- Check LeaderWorkerSet status: `kubectl describe lws ring-test -n lws-test`
-- Check LWS controller logs for errors
+LWS not creating pods?
+```bash
+kubectl describe lws ring-test -n lws-test
+```

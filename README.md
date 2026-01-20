@@ -204,6 +204,7 @@ See `test/README.md` for detailed test documentation.
 ```
 lws-operator-chart/
 ├── Chart.yaml
+├── Makefile                     # make deploy, make test, etc.
 ├── values.yaml                  # Default values
 ├── helmfile.yaml.gotmpl         # Deploy with: helmfile apply
 ├── .helmignore
@@ -223,4 +224,20 @@ lws-operator-chart/
     ├── README.md                # Test documentation
     ├── lws-ring-test.yaml       # Ring topology test
     └── lws-network-test.yaml    # Network bandwidth test
+```
+
+## Makefile
+
+For convenience, a Makefile is provided:
+
+```bash
+make deploy        # Deploy LWS operator (helmfile apply)
+make undeploy      # Remove LWS operator (scripts/cleanup.sh)
+make update-bundle # Update bundle (VERSION=1.1)
+make list-versions # List available bundle versions
+make test          # Run all tests (ring + network)
+make test-ring     # Run ring topology test
+make test-network  # Run network bandwidth test
+make clean         # Full cleanup (operator + tests)
+make clean-tests   # Cleanup test resources only
 ```
