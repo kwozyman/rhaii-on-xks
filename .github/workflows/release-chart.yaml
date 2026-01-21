@@ -95,20 +95,22 @@ jobs:
       - name: Package Chart
         run: helm package . -d .deploy
 
-      - name: Checkout gh-pages
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages
-        continue-on-error: true
-
-      - name: Create gh-pages if not exists
+      - name: Setup gh-pages branch
         run: |
-          if [ ! -d "gh-pages" ]; then
+          # Check if gh-pages exists remotely
+          if git ls-remote --heads origin gh-pages | grep -q gh-pages; then
+            echo "gh-pages exists, cloning..."
+            git clone --single-branch --branch gh-pages https://github.com/${{ github.repository }}.git gh-pages
+          else
+            echo "gh-pages does not exist, creating..."
             mkdir gh-pages
             cd gh-pages
             git init
             git checkout -b gh-pages
+            git remote add origin https://github.com/${{ github.repository }}.git
+            touch .nojekyll
+            git add .nojekyll
+            git commit -m "Init gh-pages"
           fi
 
       - name: Update Helm repo index
@@ -123,6 +125,7 @@ jobs:
           cd gh-pages
           git add .
           git commit -m "Release ${{ steps.chart.outputs.version }}"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push origin gh-pages --force
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
