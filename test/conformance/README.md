@@ -32,13 +32,34 @@ Profiles match official llm-d guides: https://github.com/llm-d/llm-d/tree/main/g
 ## What Gets Tested
 
 1. **Cluster Connectivity** - kubectl/oc access
-1b. **Operator Prerequisites** - cert-manager, LWS operator
-2. **Namespace Validation** - Namespace exists, pods healthy
+1b. **Operator Prerequisites** - cert-manager, Istio, LWS operator
+2. **Namespace Validation** - Namespace exists, pod health checks
 3. **Helm Releases** - Deployed Helm charts
 4. **Profile Components** - Profile-specific pods, deployments, CRDs
 5. **Inference Readiness** - Port-forward, /v1/models, inference test
 6. **Monitoring Stack** - Prometheus, Grafana, ServiceMonitors, PodMonitors
 7. **Recent Events** - Warning/Error events
+
+## Pod Health Checks
+
+The script performs thorough pod health validation:
+
+- **Failed pods** (Error, CrashLoop, Failed) → FAIL
+- **Pending pods** (scheduling issues, resource constraints) → FAIL
+- **Not fully ready** (Running but READY shows 0/X or 1/2) → FAIL
+
+Example output:
+```
+[FAIL] 4 pod(s) running but not fully ready
+wide-ep-llm-d-decode-0    1/2   Running   (1 of 2 containers ready)
+wide-ep-llm-d-prefill-0   0/1   Running   (0 of 1 containers ready)
+```
+
+This catches issues like:
+- Insufficient GPU resources
+- Node affinity/selector mismatches
+- Untolerated taints
+- Container startup failures
 
 ## Operator Prerequisites
 
@@ -65,13 +86,21 @@ The script checks for required operators:
 
 The script validates the monitoring stack required for metrics and autoscaling:
 
-- **Auto-detects** Prometheus namespace (monitoring, openshift-monitoring, etc.)
+- **Auto-detects** Prometheus namespace (llm-d-monitoring, monitoring, openshift-monitoring, etc.)
+- **Azure Managed Prometheus** - On AKS, detects ama-metrics pods in kube-system
 - **Prometheus** - Checks for running Prometheus pods
 - **Grafana** - Checks for Grafana (optional but recommended)
 - **ServiceMonitor CRD** - Prometheus Operator installed
 - **PodMonitor CRD** - For vLLM metrics collection
 - **llm-d Monitors** - ServiceMonitors/PodMonitors in llm-d namespace
 - **Prometheus Targets** - Validates llm-d metrics are being scraped
+
+### Azure Managed Prometheus (AKS)
+
+On AKS with Azure Managed Prometheus enabled:
+- No in-cluster Prometheus server (metrics go to Azure Monitor workspace)
+- Detected via `ama-metrics` pods in `kube-system`
+- ServiceMonitors/PodMonitors still work (Prometheus Operator CRDs required)
 
 ### Expected Monitors
 
@@ -96,10 +125,26 @@ The script detects deployments that exist but are scaled to 0:
 - Reports as WARNING: "deployment exists but scaled to 0"
 - Useful for identifying incomplete deployments
 
+## Cloud Platform Detection
+
+The script auto-detects the cloud platform:
+
+| Platform | Detection Method |
+|----------|------------------|
+| **AKS** | Node label `kubernetes.azure.com/cluster` |
+| **EKS** | Node providerID prefix `aws` |
+| **GKE** | Node providerID prefix `gce` |
+| **OpenShift** | API resource `routes.route.openshift.io` |
+| **CoreWeave** | Node region label contains `coreweave` |
+
+Platform detection enables platform-specific behaviors like preferring Azure Managed Prometheus on AKS.
+
 ## Auto-Detection
 
 The script automatically detects:
+- **Cloud Platform**: AKS, EKS, GKE, OpenShift, CoreWeave
 - **Monitoring Namespace**: Scans common namespaces for Prometheus pods
+- **Azure Managed Prometheus**: Detects ama-metrics pods on AKS
 - **Inference Service**: Scans for services matching gateway patterns
 - **Inference Port**: Prefers port 80/8000 over status ports
 - **Model Name**: Queries `/v1/models` endpoint

@@ -502,6 +502,8 @@ PASSED=0
 FAILED=0
 WARNINGS=0
 KUBECTL=""
+CLOUD_PLATFORM=""
+MANAGED_PROMETHEUS=""
 
 log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_pass() { echo -e "${GREEN}[PASS]${NC} $1"; ((PASSED++)); }
@@ -626,6 +628,62 @@ check_httproute() {
 }
 
 # =============================================================================
+# CLOUD PLATFORM DETECTION
+# =============================================================================
+
+# Detect cloud platform (AKS, EKS, GKE, OpenShift, etc.)
+detect_cloud_platform() {
+    log_info "Detecting cloud platform..."
+
+    # Check for AKS (Azure Kubernetes Service)
+    local aks_label
+    aks_label=$($KUBECTL get nodes -o jsonpath='{.items[0].metadata.labels.kubernetes\.azure\.com/cluster}' 2>/dev/null || echo "")
+    if [[ -n "$aks_label" ]]; then
+        CLOUD_PLATFORM="aks"
+        log_pass "Detected platform: AKS (Azure Kubernetes Service)"
+        return 0
+    fi
+
+    # Check for EKS (Amazon Elastic Kubernetes Service)
+    local eks_label
+    eks_label=$($KUBECTL get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -o "^aws" || echo "")
+    if [[ -n "$eks_label" ]]; then
+        CLOUD_PLATFORM="eks"
+        log_pass "Detected platform: EKS (Amazon Elastic Kubernetes Service)"
+        return 0
+    fi
+
+    # Check for GKE (Google Kubernetes Engine)
+    local gke_label
+    gke_label=$($KUBECTL get nodes -o jsonpath='{.items[0].spec.providerID}' 2>/dev/null | grep -o "^gce" || echo "")
+    if [[ -n "$gke_label" ]]; then
+        CLOUD_PLATFORM="gke"
+        log_pass "Detected platform: GKE (Google Kubernetes Engine)"
+        return 0
+    fi
+
+    # Check for OpenShift
+    if $KUBECTL api-resources | grep -q "routes.route.openshift.io"; then
+        CLOUD_PLATFORM="openshift"
+        log_pass "Detected platform: OpenShift"
+        return 0
+    fi
+
+    # Check for CoreWeave (backend.coreweave.cloud/enabled label)
+    local coreweave_label
+    coreweave_label=$($KUBECTL get nodes -o jsonpath='{.items[0].metadata.labels.backend\.coreweave\.cloud/enabled}' 2>/dev/null || echo "")
+    if [[ "$coreweave_label" == "true" ]]; then
+        CLOUD_PLATFORM="coreweave"
+        log_pass "Detected platform: CoreWeave"
+        return 0
+    fi
+
+    CLOUD_PLATFORM="unknown"
+    log_info "Platform: Unknown (generic Kubernetes)"
+    return 0
+}
+
+# =============================================================================
 # MONITORING VALIDATION
 # Based on: https://github.com/llm-d/llm-d/tree/main/docs/monitoring
 # =============================================================================
@@ -634,8 +692,20 @@ check_httproute() {
 auto_detect_monitoring_namespace() {
     log_info "Auto-detecting monitoring namespace..."
 
-    # Common monitoring namespace patterns
-    local namespaces=("monitoring" "prometheus" "openshift-monitoring" "openshift-user-workload-monitoring" "kube-prometheus-stack" "observability")
+    # On AKS, check for Azure Managed Prometheus first
+    if [[ "$CLOUD_PLATFORM" == "aks" ]]; then
+        local ama_pods
+        ama_pods=$($KUBECTL get pods -n kube-system --no-headers 2>/dev/null | grep -i "ama-metrics" | wc -l | tr -d '[:space:]')
+        if [[ "$ama_pods" -gt 0 ]]; then
+            MONITORING_NAMESPACE="kube-system"
+            MANAGED_PROMETHEUS="azure"
+            log_pass "Found Azure Managed Prometheus (ama-metrics in kube-system)"
+            return 0
+        fi
+    fi
+
+    # Common monitoring namespace patterns (llm-d-monitoring is the default for llm-d deployments)
+    local namespaces=("llm-d-monitoring" "monitoring" "prometheus" "openshift-monitoring" "openshift-user-workload-monitoring" "kube-prometheus-stack" "observability")
 
     for ns in "${namespaces[@]}"; do
         if $KUBECTL get namespace "$ns" &>/dev/null; then
@@ -648,6 +718,16 @@ auto_detect_monitoring_namespace() {
             fi
         fi
     done
+
+    # Check for Azure Managed Prometheus (ama-metrics in kube-system) - fallback for non-AKS detected
+    local ama_pods
+    ama_pods=$($KUBECTL get pods -n kube-system --no-headers 2>/dev/null | grep -i "ama-metrics" | wc -l | tr -d '[:space:]')
+    if [[ "$ama_pods" -gt 0 ]]; then
+        MONITORING_NAMESPACE="kube-system"
+        MANAGED_PROMETHEUS="azure"
+        log_pass "Found Azure Managed Prometheus (ama-metrics in kube-system)"
+        return 0
+    fi
 
     # Fallback: search all namespaces for prometheus pods
     local prom_ns
@@ -665,6 +745,19 @@ auto_detect_monitoring_namespace() {
 # Check if Prometheus is running
 check_prometheus() {
     log_info "Checking Prometheus..."
+
+    # Azure Managed Prometheus uses ama-metrics agents
+    if [[ "$MANAGED_PROMETHEUS" == "azure" ]]; then
+        local ama_running
+        ama_running=$($KUBECTL get pods -n kube-system --no-headers 2>/dev/null | grep -i "ama-metrics" | grep -c "Running" || echo "0")
+        if [[ "$ama_running" -gt 0 ]]; then
+            log_pass "Azure Managed Prometheus: $ama_running ama-metrics pod(s) running"
+            return 0
+        else
+            log_fail "Azure Managed Prometheus: ama-metrics pods not running"
+            return 1
+        fi
+    fi
 
     local prom_pods
     prom_pods=$($KUBECTL get pods -n "$MONITORING_NAMESPACE" --no-headers 2>/dev/null | grep -i "prometheus" | wc -l)
@@ -1303,6 +1396,11 @@ main() {
 
     check_cluster_connectivity || true
     [[ -z "$KUBECTL" ]] && { print_summary; exit 1; }
+
+    detect_cloud_platform || true
+    echo ""
+    echo "  Platform:   ${CLOUD_PLATFORM:-unknown}"
+    echo ""
 
     log_section "1b. Operator Prerequisites"
     check_cert_manager || true
