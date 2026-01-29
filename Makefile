@@ -27,9 +27,6 @@ help:
 deploy: check-kubeconfig
 	@echo "=== Deploying Sail Operator ==="
 	helmfile apply
-	@echo ""
-	@echo "Waiting for operator to be ready..."
-	@kubectl wait --for=condition=available deployment/servicemesh-operator3 -n $(NAMESPACE) --timeout=$(TIMEOUT)s
 	@echo "=== Operator deployed ==="
 
 undeploy: check-kubeconfig
