@@ -58,12 +58,16 @@ podman run --rm --pull=always $AUTH_ARG \
 echo "Extracted $(wc -l < "$TMP_DIR/manifests.yaml") lines"
 
 # Clear existing templates and CRDs (except custom templates)
+# Preserved custom templates:
+#   - pull-secret.yaml: Registry pull secret for Red Hat images
+#   - istio-cr.yaml: Istio CR with Gateway API config
+#   - job-fix-webhook-loop.yaml: Helm hook to fix webhook reconciliation loop
 echo "[2/3] Clearing old manifests..."
 find "$CHART_DIR/manifests-crds" -name "*.yaml" -delete 2>/dev/null || true
 find "$CHART_DIR/templates" -name "*.yaml" \
   ! -name "pull-secret.yaml" \
   ! -name "istio-cr.yaml" \
-  ! -name "post-install-hook.yaml" \
+  ! -name "job-fix-webhook-loop.yaml" \
   -delete 2>/dev/null || true
 # Note: istiod ServiceAccount is in manifests-presync/ (not templates/) with operator's Helm annotations
 

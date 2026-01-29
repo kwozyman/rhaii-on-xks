@@ -25,3 +25,8 @@ gatewayAPI:
   version: "v1.4.0"
   # Gateway API Inference Extension (InferencePool, InferenceModel, etc.)
   inferenceExtensionVersion: "v1.2.0"
+
+# Fix webhook reconciliation loop (vanilla Kubernetes only)
+# Creates a Job that annotates webhooks with sailoperator.io/ignore=true
+fixWebhookLoop:
+  enabled: true

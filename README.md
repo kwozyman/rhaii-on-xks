@@ -205,9 +205,11 @@ kubectl delete pod -n ${APP_NAMESPACE} -l gateway.istio.io/managed=istio.io-gate
 
 **Root Cause:** The sail-operator watches webhook configurations but doesn't filter out `caBundle` field changes. When istiod injects the CA certificate into the webhooks, it triggers a reconcile, which runs Helm upgrade, which resets the `caBundle`, creating a loop.
 
-**Fix:** This chart includes a workaround via a postsync hook (`scripts/fix-webhook-loop.sh`) that automatically adds the `sailoperator.io/ignore=true` annotation to both webhooks after deployment:
+**Fix:** This chart includes an automatic workaround via a Helm post-install Job (`templates/job-fix-webhook-loop.yaml`) that adds the `sailoperator.io/ignore=true` annotation to both webhooks after deployment:
 - `MutatingWebhookConfiguration/istio-sidecar-injector`
 - `ValidatingWebhookConfiguration/istio-validator-istio-system`
+
+The Job runs automatically and cleans up after success. To disable: set `fixWebhookLoop.enabled: false` in values.yaml.
 
 **If you're already affected** (revisions keep increasing):
 
@@ -237,10 +239,11 @@ sail-operator-chart/
 │   ├── namespace.yaml              # istio-system namespace
 │   └── serviceaccount-istiod.yaml  # istiod SA with imagePullSecrets
 ├── templates/
-│   ├── deployment-*.yaml        # Sail Operator deployment
-│   ├── istio-cr.yaml            # Istio CR with Gateway API
-│   ├── pull-secret.yaml         # Registry pull secret
-│   └── *.yaml                   # RBAC, ServiceAccount, etc.
+│   ├── deployment-*.yaml           # Sail Operator deployment
+│   ├── istio-cr.yaml               # Istio CR with Gateway API
+│   ├── job-fix-webhook-loop.yaml   # Post-install hook to fix reconciliation loop
+│   ├── pull-secret.yaml            # Registry pull secret
+│   └── *.yaml                      # RBAC, ServiceAccount, etc.
 └── scripts/
     ├── update-bundle.sh         # Update to new bundle version
     ├── update-pull-secret.sh    # Update expired pull secret
