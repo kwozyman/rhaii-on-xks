@@ -111,13 +111,6 @@ spec:
                                   items:
                                     type: string
                                   type: array
-                                notServiceAccounts:
-                                  description: Optional.
-                                  items:
-                                    maxLength: 320
-                                    type: string
-                                  maxItems: 16
-                                  type: array
                                 principals:
                                   description: Optional.
                                   items:
@@ -133,21 +126,8 @@ spec:
                                   items:
                                     type: string
                                   type: array
-                                serviceAccounts:
-                                  description: Optional.
-                                  items:
-                                    maxLength: 320
-                                    type: string
-                                  maxItems: 16
-                                  type: array
                               type: object
-                              x-kubernetes-validations:
-                                - message: Cannot set serviceAccounts with namespaces or principals
-                                  rule: |-
-                                    (has(self.serviceAccounts) || has(self.notServiceAccounts)) ? (!has(self.principals) &&
-                                    !has(self.notPrincipals) && !has(self.namespaces) && !has(self.notNamespaces)) : true
                           type: object
-                        maxItems: 512
                         type: array
                       to:
                         description: Optional.
@@ -221,7 +201,6 @@ spec:
                           type: object
                         type: array
                     type: object
-                  maxItems: 512
                   type: array
                 selector:
                   description: Optional.
@@ -232,13 +211,13 @@ spec:
                         type: string
                         x-kubernetes-validations:
                           - message: wildcard not allowed in label value match
-                            rule: '!self.contains("*")'
+                            rule: '!self.contains(''*'')'
                       description: One or more labels that indicate a specific set of pods/VMs on which a policy should be applied.
                       maxProperties: 4096
                       type: object
                       x-kubernetes-validations:
                         - message: wildcard not allowed in label key match
-                          rule: self.all(key, !key.contains("*"))
+                          rule: self.all(key, !key.contains('*'))
                         - message: key must not be empty
                           rule: self.all(key, key.size() != 0)
                   type: object
@@ -270,6 +249,9 @@ spec:
                     - kind
                     - name
                   type: object
+                  x-kubernetes-validations:
+                    - message: Support kinds are core/Service, networking.istio.io/ServiceEntry, gateway.networking.k8s.io/Gateway
+                      rule: '[self.group, self.kind] in [[''core'',''Service''], ['''',''Service''], [''gateway.networking.k8s.io'',''Gateway''], [''networking.istio.io'',''ServiceEntry'']]'
                 targetRefs:
                   description: Optional.
                   items:
@@ -300,12 +282,15 @@ spec:
                       - kind
                       - name
                     type: object
+                    x-kubernetes-validations:
+                      - message: Support kinds are core/Service, networking.istio.io/ServiceEntry, gateway.networking.k8s.io/Gateway
+                        rule: '[self.group, self.kind] in [[''core'',''Service''], ['''',''Service''], [''gateway.networking.k8s.io'',''Gateway''], [''networking.istio.io'',''ServiceEntry'']]'
                   maxItems: 16
                   type: array
               type: object
               x-kubernetes-validations:
                 - message: only one of targetRefs or selector can be set
-                  rule: '(has(self.selector) ? 1 : 0) + (has(self.targetRef) ? 1 : 0) + (has(self.targetRefs) ? 1 : 0) <= 1'
+                  rule: (has(self.selector)?1:0)+(has(self.targetRef)?1:0)+(has(self.targetRefs)?1:0)<=1
             status:
               properties:
                 conditions:
@@ -323,12 +308,6 @@ spec:
                       message:
                         description: Human-readable message indicating details about last transition.
                         type: string
-                      observedGeneration:
-                        anyOf:
-                          - type: integer
-                          - type: string
-                        description: Resource Generation to which the Condition refers.
-                        x-kubernetes-int-or-string: true
                       reason:
                         description: Unique, one-word, CamelCase reason for the condition's last transition.
                         type: string
@@ -344,6 +323,7 @@ spec:
                   anyOf:
                     - type: integer
                     - type: string
+                  description: Resource Generation to which the Reconciled Condition refers.
                   x-kubernetes-int-or-string: true
                 validationMessages:
                   description: Includes any errors or warnings detected by Istio's analyzers.
@@ -468,13 +448,6 @@ spec:
                                   items:
                                     type: string
                                   type: array
-                                notServiceAccounts:
-                                  description: Optional.
-                                  items:
-                                    maxLength: 320
-                                    type: string
-                                  maxItems: 16
-                                  type: array
                                 principals:
                                   description: Optional.
                                   items:
@@ -490,21 +463,8 @@ spec:
                                   items:
                                     type: string
                                   type: array
-                                serviceAccounts:
-                                  description: Optional.
-                                  items:
-                                    maxLength: 320
-                                    type: string
-                                  maxItems: 16
-                                  type: array
                               type: object
-                              x-kubernetes-validations:
-                                - message: Cannot set serviceAccounts with namespaces or principals
-                                  rule: |-
-                                    (has(self.serviceAccounts) || has(self.notServiceAccounts)) ? (!has(self.principals) &&
-                                    !has(self.notPrincipals) && !has(self.namespaces) && !has(self.notNamespaces)) : true
                           type: object
-                        maxItems: 512
                         type: array
                       to:
                         description: Optional.
@@ -578,7 +538,6 @@ spec:
                           type: object
                         type: array
                     type: object
-                  maxItems: 512
                   type: array
                 selector:
                   description: Optional.
@@ -589,13 +548,13 @@ spec:
                         type: string
                         x-kubernetes-validations:
                           - message: wildcard not allowed in label value match
-                            rule: '!self.contains("*")'
+                            rule: '!self.contains(''*'')'
                       description: One or more labels that indicate a specific set of pods/VMs on which a policy should be applied.
                       maxProperties: 4096
                       type: object
                       x-kubernetes-validations:
                         - message: wildcard not allowed in label key match
-                          rule: self.all(key, !key.contains("*"))
+                          rule: self.all(key, !key.contains('*'))
                         - message: key must not be empty
                           rule: self.all(key, key.size() != 0)
                   type: object
@@ -627,6 +586,9 @@ spec:
                     - kind
                     - name
                   type: object
+                  x-kubernetes-validations:
+                    - message: Support kinds are core/Service, networking.istio.io/ServiceEntry, gateway.networking.k8s.io/Gateway
+                      rule: '[self.group, self.kind] in [[''core'',''Service''], ['''',''Service''], [''gateway.networking.k8s.io'',''Gateway''], [''networking.istio.io'',''ServiceEntry'']]'
                 targetRefs:
                   description: Optional.
                   items:
@@ -657,12 +619,15 @@ spec:
                       - kind
                       - name
                     type: object
+                    x-kubernetes-validations:
+                      - message: Support kinds are core/Service, networking.istio.io/ServiceEntry, gateway.networking.k8s.io/Gateway
+                        rule: '[self.group, self.kind] in [[''core'',''Service''], ['''',''Service''], [''gateway.networking.k8s.io'',''Gateway''], [''networking.istio.io'',''ServiceEntry'']]'
                   maxItems: 16
                   type: array
               type: object
               x-kubernetes-validations:
                 - message: only one of targetRefs or selector can be set
-                  rule: '(has(self.selector) ? 1 : 0) + (has(self.targetRef) ? 1 : 0) + (has(self.targetRefs) ? 1 : 0) <= 1'
+                  rule: (has(self.selector)?1:0)+(has(self.targetRef)?1:0)+(has(self.targetRefs)?1:0)<=1
             status:
               properties:
                 conditions:
@@ -680,12 +645,6 @@ spec:
                       message:
                         description: Human-readable message indicating details about last transition.
                         type: string
-                      observedGeneration:
-                        anyOf:
-                          - type: integer
-                          - type: string
-                        description: Resource Generation to which the Condition refers.
-                        x-kubernetes-int-or-string: true
                       reason:
                         description: Unique, one-word, CamelCase reason for the condition's last transition.
                         type: string
@@ -701,6 +660,7 @@ spec:
                   anyOf:
                     - type: integer
                     - type: string
+                  description: Resource Generation to which the Reconciled Condition refers.
                   x-kubernetes-int-or-string: true
                 validationMessages:
                   description: Includes any errors or warnings detected by Istio's analyzers.
