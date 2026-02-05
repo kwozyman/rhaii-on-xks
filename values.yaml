@@ -26,9 +26,13 @@ authFile: ""
 # Gateway API CRD versions (applied via presync hooks)
 gatewayAPI:
   # Kubernetes Gateway API (Gateway, HTTPRoute, etc.)
+  # Required - not included in KServe kustomize
   version: "v1.4.0"
   # Gateway API Inference Extension (InferencePool, InferenceModel, etc.)
-  inferenceExtensionVersion: "v1.2.0"
+  # Set enabled: false when using with KServe (KServe installs these CRDs via config/llmisvc)
+  inferenceExtension:
+    enabled: true
+    version: "v1.2.0"
 
 # Fix webhook reconciliation loop (vanilla Kubernetes only)
 # Creates a Job that annotates webhooks with sailoperator.io/ignore=true

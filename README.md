@@ -71,13 +71,26 @@ bundle:
 pullSecretFile: ""
 ```
 
+### Using with KServe
+
+When deploying alongside KServe, disable the Inference Extension CRDs since KServe installs them via its kustomize overlay (`config/llmisvc`):
+
+```yaml
+# environments/default.yaml
+gatewayAPI:
+  inferenceExtension:
+    enabled: false  # KServe installs these CRDs
+```
+
+> **Note:** Gateway API CRDs are still installed by sail-operator-chart since KServe doesn't include them in its kustomize configuration.
+
 ## What Gets Deployed
 
 **Presync hooks** (before Helm install):
 - Namespace `istio-system`
 - istiod ServiceAccount with `imagePullSecrets` (pre-created with operator's Helm annotations)
-- Gateway API CRDs (v1.4.0) - from GitHub
-- Gateway API Inference Extension CRDs (v1.2.0) - from GitHub
+- Gateway API CRDs (v1.4.0) - from GitHub (required)
+- Gateway API Inference Extension CRDs (v1.2.0) - from GitHub (optional, skip if using KServe)
 - Sail Operator CRDs (19 Istio CRDs) - applied with `--server-side`
 
 **Helm install:**

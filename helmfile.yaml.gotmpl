@@ -53,15 +53,19 @@ releases:
         showlogs: true
         command: "kubectl"
         args: ["apply", "-f", "manifests-presync/"]
-      # Apply Gateway API CRDs
+      # Apply Gateway API CRDs (required - not included in KServe)
       - events: ["presync"]
         showlogs: true
         command: "kubectl"
         args: ["apply", "-k", "https://github.com/kubernetes-sigs/gateway-api/config/crd?ref={{ .Values.gatewayAPI.version }}"]
+{{- if .Values.gatewayAPI.inferenceExtension.enabled }}
+      # Apply Gateway API Inference Extension CRDs
+      # Skip if using KServe (KServe installs these via config/llmisvc)
       - events: ["presync"]
         showlogs: true
         command: "kubectl"
-        args: ["apply", "-k", "https://github.com/kubernetes-sigs/gateway-api-inference-extension/config/crd?ref={{ .Values.gatewayAPI.inferenceExtensionVersion }}"]
+        args: ["apply", "-k", "https://github.com/kubernetes-sigs/gateway-api-inference-extension/config/crd?ref={{ .Values.gatewayAPI.inferenceExtension.version }}"]
+{{- end }}
       # Apply Sail Operator CRDs with server-side (for large CRDs)
       - events: ["presync"]
         showlogs: true
