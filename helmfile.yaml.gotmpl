@@ -15,7 +15,6 @@ environments:
 helmDefaults:
   wait: true
   timeout: 600
-  force: true
 
 releases:
   - name: cert-manager-operator
@@ -39,11 +38,7 @@ releases:
         file: {{ .Values.authFile }}
 {{- end }}
     hooks:
-      # Apply cert-manager CRDs + Infrastructure stub with server-side
-      - events: ["presync"]
-        showlogs: true
-        command: "kubectl"
-        args: ["apply", "--server-side", "--force-conflicts", "-f", "manifests-crds/"]
+      # Note: cert-manager CRDs are now in crds/ directory and installed by Helm with SSA
       # Create Infrastructure CR (required for non-OpenShift clusters)
       - events: ["presync"]
         showlogs: true
@@ -88,8 +83,3 @@ releases:
               logLevel: Normal
               operatorLogLevel: Normal
             EOF
-      # Print next steps after install
-      - events: ["postsync"]
-        showlogs: true
-        command: "bash"
-        args: ["scripts/post-install-message.sh"]

@@ -14,6 +14,7 @@ This chart uses **olm-extractor** to extract manifests directly from Red Hat's O
 ## Prerequisites
 
 - `kubectl` configured for your cluster
+- `helm` 3.17+ (for Server-Side Apply support)
 - `helmfile` installed
 - Red Hat account for pull secret
 
@@ -72,16 +73,18 @@ pullSecretFile: ~/pull-secret.txt
 ## What Gets Deployed
 
 **Presync hooks** (before Helm install):
-- cert-manager CRDs + Infrastructure CRD stub - applied with `--server-side`
 - Infrastructure CR (required for non-OpenShift clusters)
 - Operand namespace (`cert-manager`)
 - CertManager CR (`cluster`)
 
-**Helm install:**
+**Helm install** (with Server-Side Apply):
+- cert-manager CRDs + Infrastructure CRD stub - installed from `crds/` directory with SSA
 - Operator namespace (`cert-manager-operator`)
 - Pull secrets (in both namespaces)
 - cert-manager ServiceAccounts with `imagePullSecrets` (cert-manager, cert-manager-cainjector, cert-manager-webhook)
 - cert-manager Operator deployment + RBAC
+
+> **Note:** Helm 3.17+ is required for Server-Side Apply (SSA) support.
 
 **Post-install** (automatic):
 - Operator deploys cert-manager components (controller, webhook, cainjector)
@@ -176,7 +179,7 @@ cert-manager-operator-chart/
 ├── .helmignore
 ├── environments/
 │   └── default.yaml             # User config
-├── manifests-crds/              # cert-manager CRDs + Infrastructure stub
+├── crds/                        # cert-manager CRDs + Infrastructure stub (installed by Helm with SSA)
 ├── templates/
 │   ├── deployment-*.yaml                  # Operator deployment
 │   ├── pull-secret.yaml                   # Registry pull secrets

@@ -1,5 +1,4 @@
 # Ignore everything except templates and Chart.yaml
-manifests-crds/
 scripts/
 environments/
 helmfile.yaml.gotmpl

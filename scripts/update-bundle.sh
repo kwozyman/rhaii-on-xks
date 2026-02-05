@@ -57,7 +57,7 @@ echo "Extracted $(wc -l < "$TMP_DIR/manifests.yaml") lines"
 
 # Clear existing templates and CRDs (except custom/stub CRDs)
 echo "[2/3] Clearing old manifests..."
-find "$CHART_DIR/manifests-crds" -name "*.yaml" \
+find "$CHART_DIR/crds" -name "*.yaml" \
   ! -name "customresourcedefinition-infrastructures-config-openshift-io.yaml" \
   -delete 2>/dev/null || true
 find "$CHART_DIR/templates" -name "*.yaml" \
@@ -78,7 +78,7 @@ tmp_dir = os.environ.get('TMP_DIR', '/tmp')
 chart_dir = os.environ.get('CHART_DIR', '.')
 
 input_file = f'{tmp_dir}/manifests.yaml'
-crds_dir = f'{chart_dir}/manifests-crds'
+crds_dir = f'{chart_dir}/crds'  # Helm SSA crds/ directory
 templates_dir = f'{chart_dir}/templates'
 
 os.makedirs(crds_dir, exist_ok=True)
@@ -122,6 +122,7 @@ for doc in docs:
         if kind == 'CustomResourceDefinition':
             filepath = os.path.join(crds_dir, filename)
             crd_count += 1
+            # CRDs installed by Helm with SSA
             with open(filepath, 'w') as out:
                 out.write(doc.strip() + '\n')
         elif kind == 'Namespace':
