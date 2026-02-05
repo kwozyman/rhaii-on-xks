@@ -58,15 +58,15 @@ podman run --rm --pull=always \
 echo "Extracted $(wc -l < "$TMP_DIR/manifests.yaml") lines"
 
 # Clear existing templates and CRDs (except custom templates)
-# Note: manifests-presync/ is NOT cleared - it contains custom resources like
-# lws-controller-manager ServiceAccount with imagePullSecrets
+# Preserved custom templates:
+#   - pull-secret.yaml: Registry pull secret for Red Hat images
+#   - rolebinding-kube-system-auth-reader.yaml: Required for non-OpenShift clusters
 echo "[4/4] Splitting into CRDs and templates..."
-find "$CHART_DIR/manifests-crds" -name "*.yaml" -delete 2>/dev/null || true
+find "$CHART_DIR/crds" -name "*.yaml" -delete 2>/dev/null || true
 find "$CHART_DIR/templates" -name "*.yaml" \
   ! -name "pull-secret.yaml" \
   ! -name "rolebinding-kube-system-auth-reader.yaml" \
   -delete 2>/dev/null || true
-# Note: rolebinding-kube-system-auth-reader.yaml is required for non-OpenShift clusters
 
 # Split manifests
 python3 << PYEOF
@@ -74,7 +74,7 @@ import yaml
 import os
 
 input_file = '$TMP_DIR/manifests.yaml'
-crds_dir = '$CHART_DIR/manifests-crds'
+crds_dir = '$CHART_DIR/crds'  # Helm SSA crds/ directory
 templates_dir = '$CHART_DIR/templates'
 
 os.makedirs(crds_dir, exist_ok=True)
@@ -101,6 +101,7 @@ for doc in docs:
         if kind == 'CustomResourceDefinition':
             filepath = os.path.join(crds_dir, filename)
             crd_count += 1
+            # CRDs installed by Helm with SSA
             with open(filepath, 'w') as out:
                 out.write(doc.strip() + '\n')
         elif kind == 'Namespace':

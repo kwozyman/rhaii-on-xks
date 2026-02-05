@@ -31,14 +31,7 @@ releases:
           dockerConfigJson: {{ exec "cat" (list .Values.authFile) | quote }}
 {{- end }}
     hooks:
-      - events: ["presync"]
-        showlogs: true
-        command: kubectl
-        args:
-          - apply
-          - --server-side
-          - -f
-          - manifests-crds/
+      # Note: LWS CRDs are now in crds/ directory and installed by Helm with SSA
       - events: ["presync"]
         showlogs: true
         command: bash
@@ -72,6 +65,3 @@ releases:
               managementState: Managed
             EOF
 {{- end }}
-      - events: ["postsync"]
-        showlogs: true
-        command: ./scripts/post-install-message.sh

@@ -6,7 +6,6 @@
 *.bak
 *.tmp
 *.orig
-manifests-crds/
 scripts/
 environments/
 helmfile.yaml.gotmpl

@@ -20,6 +20,7 @@ LWS provides an API for deploying a group of pods as a unit of replication, desi
 ## Prerequisites
 
 - `kubectl` configured for your cluster
+- `helm` 3.17+ (for Server-Side Apply support)
 - `helmfile` installed
 - Red Hat account for pull secret
 
@@ -78,14 +79,17 @@ pullSecretFile: ~/pull-secret.txt
 ## What Gets Deployed
 
 **Presync hooks** (before Helm install):
-- LeaderWorkerSetOperator CRD - applied with `--server-side`
 - Operator namespace (`openshift-lws-operator`)
+- LWS controller ServiceAccount with `imagePullSecrets`
 
-**Helm install:**
+**Helm install** (with Server-Side Apply):
+- LeaderWorkerSetOperator CRD - installed from `crds/` directory with SSA
 - Pull secret (`redhat-pull-secret`)
 - LWS Operator ServiceAccount with `imagePullSecrets`
 - LWS Operator deployment + RBAC
 - RoleBinding in `kube-system` for API server auth (required for non-OpenShift clusters)
+
+> **Note:** Helm 3.17+ is required for Server-Side Apply (SSA) support.
 
 **Post-install** (automatic):
 - LeaderWorkerSetOperator CR (`cluster`)
@@ -210,7 +214,8 @@ lws-operator-chart/
 ├── .helmignore
 ├── environments/
 │   └── default.yaml             # User config
-├── manifests-crds/              # LeaderWorkerSetOperator CRD
+├── crds/                        # LeaderWorkerSetOperator CRD (installed by Helm with SSA)
+├── manifests-presync/           # Resources applied before Helm install
 ├── templates/
 │   ├── deployment-*.yaml        # Operator deployment
 │   ├── pull-secret.yaml         # Registry pull secret
