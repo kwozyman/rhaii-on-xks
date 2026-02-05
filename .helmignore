@@ -1,5 +1,3 @@
-# Ignore CRDs (applied via helmfile hook, not Helm)
-manifests-crds/
 
 # Ignore scripts
 scripts/

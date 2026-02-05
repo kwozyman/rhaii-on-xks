@@ -63,7 +63,7 @@ echo "Extracted $(wc -l < "$TMP_DIR/manifests.yaml") lines"
 #   - istio-cr.yaml: Istio CR with Gateway API config
 #   - job-fix-webhook-loop.yaml: Helm hook to fix webhook reconciliation loop
 echo "[2/3] Clearing old manifests..."
-find "$CHART_DIR/manifests-crds" -name "*.yaml" -delete 2>/dev/null || true
+find "$CHART_DIR/crds" -name "*.yaml" -delete 2>/dev/null || true
 find "$CHART_DIR/templates" -name "*.yaml" \
   ! -name "pull-secret.yaml" \
   ! -name "istio-cr.yaml" \
@@ -78,7 +78,7 @@ import yaml
 import os
 
 input_file = '$TMP_DIR/manifests.yaml'
-crds_dir = '$CHART_DIR/manifests-crds'
+crds_dir = '$CHART_DIR/crds'  # Helm SSA crds/ directory
 templates_dir = '$CHART_DIR/templates'
 
 os.makedirs(crds_dir, exist_ok=True)
@@ -105,7 +105,7 @@ for doc in docs:
         if kind == 'CustomResourceDefinition':
             filepath = os.path.join(crds_dir, filename)
             crd_count += 1
-            # CRDs stay as-is
+            # CRDs installed by Helm with SSA
             with open(filepath, 'w') as out:
                 out.write(doc.strip() + '\n')
         elif kind == 'Namespace':

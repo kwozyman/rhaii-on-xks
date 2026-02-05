@@ -5,6 +5,7 @@ Deploy Red Hat Sail Operator (OSSM 3.x / Istio 1.27) on any Kubernetes cluster w
 ## Prerequisites
 
 - `kubectl` configured for your cluster
+- `helm` 3.17+ (for Server-Side Apply support)
 - `helmfile` installed
 - Red Hat account for pull secret
 
@@ -91,12 +92,14 @@ gatewayAPI:
 - istiod ServiceAccount with `imagePullSecrets` (pre-created with operator's Helm annotations)
 - Gateway API CRDs (v1.4.0) - from GitHub (required)
 - Gateway API Inference Extension CRDs (v1.2.0) - from GitHub (optional, skip if using KServe)
-- Sail Operator CRDs (19 Istio CRDs) - applied with `--server-side`
 
-**Helm install:**
+**Helm install** (with Server-Side Apply):
+- Sail Operator CRDs (19 Istio CRDs) - installed from `crds/` directory with SSA
 - Pull secret `redhat-pull-secret`
 - Sail Operator deployment + RBAC
 - Istio CR with Gateway API enabled
+
+> **Note:** Helm 3.17+ is required for Server-Side Apply (SSA) support. SSA handles large CRDs (some are 700KB+) that would fail with client-side apply.
 
 **Post-install** (automatic):
 - Operator deploys istiod (uses pre-created SA with `imagePullSecrets`)
@@ -280,7 +283,7 @@ sail-operator-chart/
 ├── .helmignore                  # Excludes large files from Helm
 ├── environments/
 │   └── default.yaml             # User config (useSystemPodmanAuth)
-├── manifests-crds/              # 19 Istio CRDs (applied via presync hook)
+├── crds/                        # 19 Istio CRDs (installed by Helm with SSA)
 ├── manifests-presync/           # Resources applied before Helm install
 │   ├── namespace.yaml              # istio-system namespace
 │   └── serviceaccount-istiod.yaml  # istiod SA with imagePullSecrets
