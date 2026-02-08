@@ -38,48 +38,11 @@ releases:
         file: {{ .Values.authFile }}
 {{- end }}
     hooks:
-      # Note: cert-manager CRDs are now in crds/ directory and installed by Helm with SSA
-      # Create Infrastructure CR (required for non-OpenShift clusters)
-      - events: ["presync"]
-        showlogs: true
-        command: "bash"
-        args:
-          - "-c"
-          - |
-            cat <<'EOF' | kubectl apply -f -
-            apiVersion: config.openshift.io/v1
-            kind: Infrastructure
-            metadata:
-              name: cluster
-            spec: {}
-            status:
-              controlPlaneTopology: HighlyAvailable
-              infrastructureTopology: HighlyAvailable
-              platform: None
-            EOF
-      # Create operand namespace
-      - events: ["presync"]
-        showlogs: true
-        command: "kubectl"
-        args: ["create", "namespace", "{{ .Values.operandNamespace }}", "--dry-run=client", "-o", "yaml"]
+      # Create operand namespace before chart install
       - events: ["presync"]
         showlogs: true
         command: "bash"
         args: ["-c", "kubectl create namespace {{ .Values.operandNamespace }} --dry-run=client -o yaml | kubectl apply -f -"]
-      # Create CertManager CR before operator starts (prevents race condition)
-      - events: ["presync"]
-        showlogs: true
-        command: "bash"
-        args:
-          - "-c"
-          - |
-            cat <<'EOF' | kubectl apply -f -
-            apiVersion: operator.openshift.io/v1alpha1
-            kind: CertManager
-            metadata:
-              name: cluster
-            spec:
-              managementState: Managed
-              logLevel: Normal
-              operatorLogLevel: Normal
-            EOF
+      # Note: CRDs are in crds/ directory, CRs are in templates/
+      # - Infrastructure CR (templates/infrastructure-cr.yaml)
+      # - CertManager CR (templates/certmanager-cr.yaml)
