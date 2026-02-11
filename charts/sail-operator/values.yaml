@@ -1,0 +1,58 @@
+# Sail Operator Helm Chart - Default Values
+# Override in environments/default.yaml
+
+namespace: istio-system
+
+bundle:
+  source: redhat        # "redhat" or "konflux"
+  version: "3.2.1"
+
+# Istio version to deploy (must match bundle version)
+# OSSM 3.1.x -> v1.26.x, OSSM 3.2.x -> v1.27.x, OSSM 3.3.x -> v1.28.x
+istioVersion: "v1.27-latest"
+
+pullSecret:
+  name: redhat-pull-secret
+  dockerConfigJson: ""  # Set via --set-file or environments/default.yaml
+
+# Auth source (set ONE of these in environments/default.yaml):
+#   useSystemPodmanAuth: true                    # Use ~/.config/containers/auth.json (persistent, recommended)
+#   pullSecretFile: /path/to/pull-secret.txt     # OpenShift pull secret file
+#   authFile: ~/.config/containers/auth.json     # Custom auth file path
+useSystemPodmanAuth: false
+pullSecretFile: ""
+authFile: ""
+
+# Gateway API CRD versions (applied via presync hooks)
+gatewayAPI:
+  # Kubernetes Gateway API (Gateway, HTTPRoute, etc.)
+  # Required - not included in KServe kustomize
+  version: "v1.4.0"
+  # Gateway API Inference Extension (InferencePool, InferenceModel, etc.)
+  # Set enabled: false when using with KServe (KServe installs these CRDs via config/llmisvc)
+  inferenceExtension:
+    enabled: true
+    version: "v1.2.0"
+
+# Fix webhook reconciliation loop (vanilla Kubernetes only)
+# Creates a Job that annotates webhooks with sailoperator.io/ignore=true
+fixWebhookLoop:
+  enabled: true
+
+# Inference Gateway for KServe/llm-d
+# Creates Gateway with CA bundle mount for mTLS to backend services
+inferenceGateway:
+  enabled: true
+  name: inference-gateway
+  namespace: opendatahub  # Namespace where KServe is deployed
+  # CA bundle configuration
+  caBundle:
+    # Source secret containing the CA certificate
+    sourceSecret: opendatahub-ca
+    sourceNamespace: cert-manager
+    # Key in the source secret (try ca.crt first, fallback to tls.crt)
+    sourceKey: tls.crt
+    # ConfigMap name to create with the CA bundle
+    configMapName: odh-ca-bundle
+    # Mount path in Gateway pod (must match KServe llm-d expectation)
+    mountPath: /var/run/secrets/opendatahub
