@@ -1,0 +1,19 @@
+# cert-manager Operator Helm Chart - Default Values
+
+# Namespaces
+operatorNamespace: cert-manager-operator
+operandNamespace: cert-manager
+
+# Bundle version — pinned to tested release; bump via ./scripts/update-bundle.sh
+bundle:
+  version: "v1.15.2"
+
+# Pull secret for registry.redhat.io
+# Auth is configured in the root values.yaml and passed via helmfile
+pullSecret:
+  name: redhat-pull-secret
+  dockerConfigJson: ""  # Set automatically by helmfile from root auth config
+
+# CertManager CR settings (deployed after operator is ready)
+certManager:
+  enabled: true

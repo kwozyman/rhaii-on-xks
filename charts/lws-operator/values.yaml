@@ -1,0 +1,17 @@
+# LWS Operator Helm Chart - Default Values
+
+namespace: openshift-lws-operator
+
+bundle:
+  version: "1.0"
+
+# Pull secret for registry.redhat.io
+# Auth is configured in the root values.yaml and passed via helmfile
+pullSecret:
+  name: redhat-pull-secret
+  dockerConfigJson: ""  # Set automatically by helmfile from root auth config
+
+# LeaderWorkerSetOperator CR settings
+lwsOperator:
+  enabled: true
+  name: cluster

@@ -1,0 +1,66 @@
+helmDefaults:
+  wait: true
+  timeout: 600
+
+# Deployed via the root helmfile (values passed from root values.yaml)
+environments:
+  default:
+    values:
+      - values.yaml
+
+---
+
+repositories: []
+
+releases:
+  - name: lws-operator
+    namespace: {{ .Values.namespace | default "openshift-lws-operator" }}
+    chart: ./
+    createNamespace: true
+    values:
+      - values.yaml
+{{- if .Values.useSystemPodmanAuth }}
+      - pullSecret:
+          dockerConfigJson: {{ exec "cat" (list (env "HOME" | printf "%s/.config/containers/auth.json")) | quote }}
+{{- else if .Values.pullSecretFile }}
+      - pullSecret:
+          dockerConfigJson: {{ exec "cat" (list .Values.pullSecretFile) | quote }}
+{{- else if .Values.authFile }}
+      - pullSecret:
+          dockerConfigJson: {{ exec "cat" (list .Values.authFile) | quote }}
+{{- end }}
+    hooks:
+      # Note: LWS CRDs are now in crds/ directory and installed by Helm with SSA
+      - events: ["presync"]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - "kubectl create namespace {{ .Values.namespace | default "openshift-lws-operator" }} --dry-run=client -o yaml | kubectl apply -f -"
+      # Pre-create lws-controller-manager ServiceAccount with imagePullSecrets
+      # The operator will adopt this SA when it creates the controller
+      - events: ["presync"]
+        showlogs: true
+        command: kubectl
+        args:
+          - apply
+          - --server-side
+          - --force-conflicts
+          - -f
+          - manifests-presync/
+{{- if .Values.lwsOperator.enabled }}
+      - events: ["postsync"]
+        showlogs: true
+        command: bash
+        args:
+          - -c
+          - |
+            cat <<EOF | kubectl apply -f -
+            apiVersion: operator.openshift.io/v1
+            kind: LeaderWorkerSetOperator
+            metadata:
+              name: {{ .Values.lwsOperator.name | default "cluster" }}
+            spec:
+              managementState: Managed
+            EOF
+{{- end }}

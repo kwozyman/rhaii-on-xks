@@ -1,0 +1,66 @@
+# Sail Operator Helmfile
+#
+# Deployed via the root helmfile (values passed from root values.yaml)
+
+environments:
+  default:
+    values:
+      - values.yaml
+
+---
+
+helmDefaults:
+  wait: true
+  timeout: 600
+
+releases:
+  - name: sail-operator
+    namespace: {{ .Values.namespace }}
+    createNamespace: true
+    chart: ./
+    # CRDs are in crds/ directory, installed by Helm with SSA (--server-side)
+    disableValidationOnInstall: true
+    values:
+      - values.yaml
+    set:
+      - name: bundle.source
+        value: {{ .Values.bundle.source }}
+      - name: bundle.version
+        value: {{ .Values.bundle.version }}
+{{- if .Values.useSystemPodmanAuth }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ env "HOME" }}/.config/containers/auth.json
+{{- else if .Values.pullSecretFile }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ .Values.pullSecretFile }}
+{{- else if .Values.authFile }}
+      - name: pullSecret.dockerConfigJson
+        file: {{ .Values.authFile }}
+{{- end }}
+    hooks:
+      # Apply istiod ServiceAccount before Helm (with operator's expected annotations)
+      - events: ["presync"]
+        showlogs: true
+        command: "kubectl"
+        args: ["apply", "-f", "manifests-presync/"]
+      # Apply Gateway API CRDs (required - not included in KServe)
+      - events: ["presync"]
+        showlogs: true
+        command: "kubectl"
+        args: ["apply", "-k", "https://github.com/kubernetes-sigs/gateway-api/config/crd?ref={{ .Values.gatewayAPI.version }}"]
+{{- if .Values.gatewayAPI.inferenceExtension.enabled }}
+      # Apply Gateway API Inference Extension CRDs
+      # Skip if using KServe (KServe installs these via config/llmisvc)
+      - events: ["presync"]
+        showlogs: true
+        command: "kubectl"
+        args: ["apply", "-k", "https://github.com/kubernetes-sigs/gateway-api-inference-extension/config/crd?ref={{ .Values.gatewayAPI.inferenceExtension.version }}"]
+{{- end }}
+      # Note: Sail Operator CRDs are now in crds/ directory and installed by Helm with SSA
+{{- if .Values.fixWebhookLoop.enabled }}
+      # Fix webhook reconciliation loop (vanilla Kubernetes only)
+      - events: ["postsync"]
+        showlogs: true
+        command: "bash"
+        args: ["scripts/fix-webhook-loop.sh", "{{ .Values.namespace }}"]
+{{- end }}
