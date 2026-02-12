@@ -188,14 +188,16 @@ class LLMDXKSChecks:
                 if int(node.status.allocatable["nvidia.com/gpu"]) > 0:
                     return True
                 else:
-                    self.logger.warning(f"No allocatabled NVIDIA GPUs on node {node.metadata.name}\
-                         - no NVIDIA GPU drivers present")
+                    self.logger.warning(
+                            f"No allocatable NVIDIA GPUs on node {node.metadata.name}"
+                            " - no NVIDIA GPU drivers present")
                     return False
             else:
-                self.logger.warning(f"No NVIDIA GPU drivers present on node {node.metadata.name}\
-                     - no NVIDIA GPU accelerators present")
+                self.logger.warning(
+                        f"No NVIDIA GPU drivers present on node {node.metadata.name}"
+                        " - no NVIDIA GPU accelerators present")
                 return False
-
+        gpu_found = False
         accelerators = {
             "nvidia": 0,
             "other": 0,
@@ -206,11 +208,11 @@ class LLMDXKSChecks:
             if "nvidia.com/gpu.present" in labels:
                 accelerators["nvidia"] += 1
                 self.logger.info(f"NVIDIA GPU accelerator present on node {node.metadata.name}")
-                if not nvidia_driver_present(node):
-                    return False
+                if nvidia_driver_present(node):
+                    gpu_found = True
             else:
                 accelerators["other"] += 1
-        if accelerators["other"] == len(nodes.items):
+        if not gpu_found:
             self.logger.warning("No supported GPU drivers found")
             return False
         else:
