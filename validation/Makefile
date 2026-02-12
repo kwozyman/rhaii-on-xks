@@ -8,7 +8,7 @@ CONTAINER_TOOL ?= podman
 HOST_KUBECONFIG ?= ~/.kube/config
 FROM ?= registry.fedoraproject.org/fedora:latest
 
-.PHONY: help test install uninstall lint pep8-fix
+.PHONY: help container run push lint pep8-fix
 
 help:
 	@echo "Available targets:"
