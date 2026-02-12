@@ -261,7 +261,6 @@ class LLMDXKSChecks:
         clouds = {
             "none": 0,
             "azure": 0,
-            "aws": 0
         }
         nodes = self.k8s_core_api.list_node()
         for node in nodes.items:
