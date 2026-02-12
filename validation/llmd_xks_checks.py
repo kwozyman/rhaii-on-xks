@@ -271,7 +271,9 @@ class LLMDXKSChecks:
 
         return max(clouds, key=clouds.get)
 
-    def run(self, tests=[]):
+    def run(self, tests=None):
+        if tests is None:
+            tests = []
         for test in tests:
             if test["function"]():
                 self.logger.debug(f"Test {test['name']} passed")
