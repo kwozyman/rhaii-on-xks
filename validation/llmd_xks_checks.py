@@ -114,6 +114,13 @@ class LLMDXKSChecks:
                             "result": False,
                             "optional": False
                         },
+                        {
+                            "name": "operator_kserve",
+                            "function": self.test_operator_kserve,
+                            "description": "test if the kserve controller is running properly",
+                            "suggested_action": "install or verify kserve deployment",
+                            "result": False,
+                        },
                     ]
                     }
             }
@@ -256,6 +263,12 @@ class LLMDXKSChecks:
         else:
             self.logger.warning("Missing kserve CRDs")
             return False
+
+    def test_operator_kserve(self):
+        test_failed = False
+        if not self._deployment_ready("opendatahub", "kserve-controller-manager"):
+            test_failed = True
+        return not test_failed
 
     def test_gpu_availability(self):
         def nvidia_driver_present(node):
