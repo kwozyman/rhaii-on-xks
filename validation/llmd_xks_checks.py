@@ -23,9 +23,8 @@ class LLMDXKSChecks:
         self.logger.debug(f"Arguments: {kwargs}")
         self.logger.debug("LLMDXKSChecks initialized")
 
-        self.k8s_core_api, self.k8s_ext_api = self._k8s_connection()
-
-        if self.k8s_core_api is None or self.k8s_ext_api is None:
+        self.k8s_client = self._k8s_connection()
+        if self.k8s_client is None:
             self.logger.error("Failed to connect to Kubernetes cluster")
             sys.exit(1)
 
@@ -108,18 +107,18 @@ class LLMDXKSChecks:
     def _k8s_connection(self):
         try:
             kubernetes.config.load_kube_config(config_file=self.kube_config)
-            core_api = kubernetes.client.CoreV1Api()
-            ext_api = kubernetes.client.ApiextensionsV1Api()
+            client = kubernetes.client
+            client.CoreV1Api()
         except Exception as e:
             self.logger.error(f"{e}")
-            return None, None
+            return None
         self.logger.info("Kubernetes connection established")
-        return core_api, ext_api
+        return client
 
     def _get_all_crd_names(self, cache=True):
         if cache and self.crds_cache is not None:
             return self.crds_cache
-        crd_list = self.k8s_ext_api.list_custom_resource_definition()
+        crd_list = self.k8s_client.ApiextensionsV1Api().list_custom_resource_definition()
         crd_names = {crd.metadata.name for crd in crd_list.items}
         if cache:
             self.crds_cache = crd_names
@@ -214,7 +213,7 @@ class LLMDXKSChecks:
             "nvidia": 0,
             "other": 0,
         }
-        nodes = self.k8s_core_api.list_node()
+        nodes = self.k8s_client.CoreV1Api().list_node() or {}
         for node in nodes.items:
             labels = node.metadata.labels or {}
             if "nvidia.com/gpu.present" in labels:
@@ -240,7 +239,7 @@ class LLMDXKSChecks:
                 "Standard_ND96isr_H100_v5": 0,
                 "Standard_ND96isr_H200_v5": 0,
             }
-            nodes = self.k8s_core_api.list_node() or {}
+            nodes = self.k8s_client.CoreV1Api().list_node() or {}
             for node in nodes.items:
                 labels = node.metadata.labels
                 instance_type = ""
@@ -274,7 +273,7 @@ class LLMDXKSChecks:
             "none": 0,
             "azure": 0,
         }
-        nodes = self.k8s_core_api.list_node() or {}
+        nodes = self.k8s_client.CoreV1Api().list_node() or {}
         for node in nodes.items:
             labels = node.metadata.labels
             if "kubernetes.azure.com/cluster" in labels:
