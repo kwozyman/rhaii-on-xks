@@ -135,6 +135,21 @@ class LLMDXKSChecks:
             self.logger.debug("All tested CRDs are present")
         return return_value
 
+    def _deployment_ready(self, namespace_name, deployment_name):
+        try:
+            deployment = self.k8s_client.AppsV1Api().read_namespaced_deployment(name=deployment_name, namespace=namespace_name)
+        except Exception as e:
+            self.logger.error(f"{e}")
+            return False
+        desired = deployment.spec.replicas
+        ready = deployment.status.ready_replicas or 0
+        if ready != desired:
+            self.logger.warning(f"Deployment {namespace_name}/{deployment_name} has only {ready} replicas out of {desired} desired")
+            return False
+        else:
+            self.logger.info(f"Deployment {namespace_name}/{deployment_name} ready")
+            return True
+
     def test_crd_certmanager(self):
         required_crds = [
             "certificaterequests.cert-manager.io",
