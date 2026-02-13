@@ -70,6 +70,13 @@ class LLMDXKSChecks:
                             "result": False
                         },
                         {
+                            "name": "operator_certmanager",
+                            "function": self.test_operator_certmanager,
+                            "description": "test if the cert-manager operator is running properly",
+                            "suggested_action": "install or verify cert-manager deployment",
+                            "result": False
+                        },
+                        {
                             "name": "crd_sailoperator",
                             "function": self.test_crd_sailoperator,
                             "description": "test if the cluster has the sailoperator crds",
@@ -137,14 +144,16 @@ class LLMDXKSChecks:
 
     def _deployment_ready(self, namespace_name, deployment_name):
         try:
-            deployment = self.k8s_client.AppsV1Api().read_namespaced_deployment(name=deployment_name, namespace=namespace_name)
+            deployment = self.k8s_client.AppsV1Api().read_namespaced_deployment(
+                    name=deployment_name, namespace=namespace_name)
         except Exception as e:
             self.logger.error(f"{e}")
             return False
         desired = deployment.spec.replicas
         ready = deployment.status.ready_replicas or 0
         if ready != desired:
-            self.logger.warning(f"Deployment {namespace_name}/{deployment_name} has only {ready} replicas out of {desired} desired")
+            self.logger.warning(f"Deployment {namespace_name}/{deployment_name} has "
+                                "only {ready} replicas out of {desired} desired")
             return False
         else:
             self.logger.info(f"Deployment {namespace_name}/{deployment_name} ready")
@@ -163,6 +172,18 @@ class LLMDXKSChecks:
         else:
             self.logger.warning("Missing cert-manager CRDs")
             return False
+
+    def test_operator_certmanager(self):
+        test_failed = False
+        if not self._deployment_ready("cert-manager-operator", "cert-manager-operator-controller-manager"):
+            test_failed = True
+        if not self._deployment_ready("cert-manager", "cert-manager-webhook"):
+            test_failed = True
+        if not self._deployment_ready("cert-manager", "cert-manager-cainjector"):
+            test_failed = True
+        if not self._deployment_ready("cert-manager", "cert-manager"):
+            test_failed = True
+        return not test_failed
 
     def test_crd_sailoperator(self):
         required_crds = [
